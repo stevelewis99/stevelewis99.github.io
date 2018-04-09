@@ -76,6 +76,24 @@
     .leaflet-popup-content {
       margin: 5px 10px;
     }
+    
+    .popup-container {
+      padding: 3px;
+      
+    }
+    
+    .popup-container li {
+      list-style-type: none;
+    }
+    
+    .popup-container li:last-child {
+      margin-bottom: 0;
+    }
+    
+    .popup-container h2 {
+      font: 600 16px/22px 'Open Sans';
+      margin-bottom: 12px
+    }
   </style>
 </head>
 
@@ -348,6 +366,34 @@ unnest(array['2017-01-14'::timestamp, '2017-03-03', '2017-04-08','2017-05-02','2
 
       createFeatureInfoFromQuery(sqlQueryFeatureInfo, featureEvent.data.id_numero, sqlQueryChart, createChartFromQuery);
     });
+
+    const popup = L.popup({
+      closeButton: false
+    });
+    setPopupsHover();
+
+    function openPopup(featureEvent) {
+      let content = '';
+      content += `<div class="popup-container">`;
+      if (featureEvent.data.id_numero) {
+        content += `<h2>${featureEvent.data.id_numero}</h2>`;
+      }
+      content += `</div>`;
+      popup.setContent(content);
+      popup.setLatLng(featureEvent.latLng);
+      if (!popup.isOpen()) {
+        popup.openOn(map);
+      }
+    }
+
+    function closePopup(featureEvent) {
+      popup.removeFrom(map);
+    }
+
+    function setPopupsHover() {
+      layer.on('featureOver', openPopup);
+      layer.on('featureOut', closePopup);
+    }
   </script>
 </body>
 
