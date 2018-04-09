@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+
+  <title>MAP</title>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+  <!-- Include Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.3.1/dist/leaflet.js"></script>
+  <link href="https://unpkg.com/leaflet@1.3.1/dist/leaflet.css" rel="stylesheet">
+  <!-- Include CARTO.js -->
+  <script src="https://unpkg.com/carto.js/carto.min.js"></script>
+
+  <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.2.1.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+  <!-- highcharts -->
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/modules/data.js"></script>
+
+  <style>
+    body {
+      width: 100vw;
+      height: 100vh;
+      min-height: 100vh;
+      background-color: #0f0b24;
+      padding: 10px;
+    }
+    
+    .fill {
+      height: 100vh;
+      min-height: 100vw;
+    }
+    
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+    
+    .popup-container {
+      padding: 0px;
+    }
+    
+    .popup-container li {
+      list-style-type: none;
+      margin-bottom: 8px;
+    }
+    
+    .popup-container li:last-child {
+      margin-bottom: 0;
+    }
+    
+    .popup-container h2 {
+      font: 600 16px/22px 'Open Sans';
+      margin-bottom: 12px
+    }
+    
+    .popup-container h3 {
+      font: 400 10px/14px 'Open Sans';
+      color: #747D82;
+      text-transform: uppercase;
+    }
+    
+    .popup-container h4 {
+      font: 600 12px/16px 'Open Sans';
+    }
+    
+    .leaflet-popup-content {
+      margin: 5px 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar navbar-expand navbar-light bg-light">
+    <a class="navbar-brand" href="#">Environment Systems</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Menu
+        </a>
+          <div id="dropdown-menu-layers" class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <!-- menu items wil get inserted here -->
+          </div>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container-fluid">
+
+    <div class="row">
+      <div class="col-8 px-0">
+        <div id="map"></div>
+
+      </div>
+      <div class="col-4 bg-dark text-center">
+        <label class="text-light"></label>
+        <img src="" />
+        <div class="card">
+          <img class="card-img-top mx-auto" src="http://www.envsys.co.uk/wp-content/themes/envsys/images/environment-systems-logo.png" style="max-width:266px" alt="Card image cap">
+        </div>
+        <br/>
+        <div id="featureInfoChart" class="card">
+          <div class="card-header">
+            Chart
+          </div>
+          <div class="card-body">
+            <div id="chartContainer"></div>
+          </div>
+        </div>
+        <br/>
+        <div id="featureInfo" class="card">
+          <div class="card-header">
+            Feature Info
+          </div>
+          <div class="card-body">
+            <p id="placeholderText" class="card-text">Select a map feature in order to display more detailed information.</p>
+            <ul id="info_field_list" class="list-group list-group-flush">
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    var chartData = [];
+    var chartOptions = {
+      chart: {
+        type: 'spline',
+        height: '300px'
+      },
+      title: {
+        text: null
+      },
+      subtitle: {
+        text: '..'
+      },
+      legend: {
+        enabled: false
+      },
+      tooltip: {
+        enabled: true,
+        formatter: function() {
+          return '<b>' + this.series.name + '</b><br/>' +
+            Highcharts.dateFormat('%d %B %Y', this.x * 1000) + ': ' + this.y;
+
+        }
+      },
+      xAxis: {
+        title: {
+          text: 'Date',
+          scalable: false
+        },
+        type: 'datetime',
+        labels: {
+          formatter: function() {
+            return Highcharts.dateFormat('%e %b', this.value * 1000); // milliseconds not seconds
+          },
+        }
+      }
+    };
+
+    const map = L.map('map').setView([-7.049395937996585, -79.55617083935068], 13);
+
+    // create CARTO voyager basemap layer
+    var cartoBasemapLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png', {
+      maxZoom: 18
+    });
+
+    // create NASA WMS basemap layer
+    var wmsLayer = L.tileLayer.wms('https://demo.boundlessgeo.com/geoserver/ows?', {
+      layers: 'nasa:bluemarble'
+    });
+
+    var topomap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17,
+      attribution: 'Map data: &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+    });
+
+    // create basemaps layergroup
+    var baseLayerGroup = L.layerGroup().addTo(map);
+
+    const sqlUser = 'steve-carto';
+    const sqlApi = "https://" + sqlUser + ".carto.com/api/v2/sql?q=";
+
+    const client = new carto.Client({
+      apiKey: 'YOUR_API_KEY',
+      username: 'steve-carto'
+    });
+
+    // add empty leaflet layer from carto client to map as placeholder (will add layers to this leafletlayer later)
+    client.getLeafletLayer().addTo(map);
+
+    const source = new carto.source.Dataset(`
+        envsys_parcels
+      `);
+
+    const source_sql = new carto.source.SQL(`SELECT cartodb_id, id_numero, crop, the_geom as the_geom, ST_Transform(the_geom,3857) as the_geom_webmercator,
+unnest(array['2017-01-14'::timestamp, '2017-03-03', '2017-04-08','2017-05-02','2017-06-07','2017-08-06','2017-09-11','2017-10-05','2017-11-22']) AS read_time,
+       unnest(array[_1401_mean, _0303_mean, _0804_mean, _0205_mean, _0706_mean, _0608_mean, _1109_mean, _0510_mean, _2211_mean]) AS read_value 
+       from envsys_parcels`);
+
+
+    const style = new carto.style.CartoCSS(`
+        #layer {polygon-fill: #826DBA;polygon-opacity: 0.9;::outline {line-color: #FFFFFF; line-width: 1; line-opacity: 0.5;}}
+      `);
+
+    const style_for_sql = new carto.style.CartoCSS(`
+        #layer {
+                polygon-fill: ramp([read_value], (#ca562c, #de8a5a, #edbb8a, #f6edbd, #b4c8a8, #70a494, #008080), quantiles);
+                polygon-opacity: 0.74;
+        }
+        #layer::outline {
+                line-width: 0.2;
+                line-color: #ffffff;
+                line-opacity: 0.33;
+        }
+      `);
+
+    const layer = new carto.layer.Layer(source_sql, style_for_sql, {
+      featureClickColumns: ['id_numero', 'crop']
+    });
+
+
+    var baseMapLayers = {
+      "topo": topomap,
+      "CARTO Voyager (xyz)": cartoBasemapLayer,
+      "NASA (wms)": wmsLayer
+    };
+
+    var overlayLayers = {
+      "Populated places": layer
+    };
+
+    populateBasemapMenu('dropdown-menu-layers', baseMapLayers);
+
+    client.addLayer(layer);
+
+    function populateBasemapMenu(menuId, layers) {
+      var divLayersMenu = $('#' + menuId);
+      var i = 0;
+      $.each(layers, function(name, object) {
+        var inputId = "basemap-" + i;
+        // if the first item in the list, create the 'Basemap' heading label first
+        if (i == 0) {
+          divLayersMenu.append("<label class='ml-2'>Basemap</label>", "<br/>", "<div id='basemap-toggle' class='btn-group btn-group-toggle ml-4 mr-4' data-toggle='buttons'>");
+          //add the input for current item
+          $('#basemap-toggle').append("<label class='btn btn-secondary active'><input type='radio' name='basemap-options' id='basemap-" + i + "' autocomplete='off' checked>" + name + "</label>");
+          //add this first layer to the baseLayerGroup
+          baseLayerGroup.addLayer(object);
+          baseLayerGroup.setZIndex(0);
+        } else if (i > 0) {
+          $('#basemap-toggle').append("<label class='btn btn-secondary'><input type='radio' name='basemap-options' id='" + inputId + "' autocomplete='off'>" + name + "</label>");
+        }
+
+        //add handler to radio inputs to clear baselayer group and add the selected one
+        var selector = '#' + inputId;
+        $(selector).change(function() {
+          baseLayerGroup.clearLayers();
+          baseLayerGroup.addLayer(object);
+          baseLayerGroup.setZIndex(0);
+        });
+        i++;
+      })
+      divLayersMenu.append("<div class='dropdown-divider'></div>");
+
+    };
+
+    var sqlBaseFeatureInfo = "WITH tbl as (" + source_sql.getQuery() + ") SELECT read_value as y, extract(epoch from read_time) as x FROM tbl LIMIT 1000";
+    var sqlBaseChart = "WITH tbl as (" + source_sql.getQuery() + ") SELECT read_value as y, extract(epoch from read_time) as x FROM tbl LIMIT 1000";
+
+    function createFeatureInfoFromQuery(query, id_numero, chartQuery, callback) {
+      var harvest = 0;
+      var start_seas = 0;
+      $.getJSON(sqlApi + query, function(data) {
+        $('#placeholderText').remove();
+        $('#info_field_list').children().remove();
+        $.each(data.rows[0], function(key, value) {
+          $('#info_field_list').append("<li class='list-group-item'><strong>" + key + ":  </strong>" + value + "</li>");
+          if (key == "harvest") {
+            harvest = Math.round(new Date(value).getTime() / 1000.0);
+          }
+          if (key == "start_seas") {
+            start_seas = Math.round(new Date(value).getTime() / 1000.0);
+          }
+        }).done(callback(chartQuery, id_numero, harvest, start_seas))
+      })
+
+
+    };
+
+    function createChartFromQuery(query, id_numero, harvest, start_seas) {
+      $.getJSON(sqlApi + query, function(data) {
+        var chart = new Highcharts.Chart('chartContainer', chartOptions);
+        chart.addSeries({
+          data: data.rows,
+          name: 'ID Numero: ' + id_numero
+        });
+        if (harvest) {
+          chart.xAxis[0].addPlotLine({
+            value: harvest,
+            color: 'red',
+            width: 2,
+            id: 'plot-line-1',
+            label: {
+              text: 'Harvest',
+              align: 'left',
+              y: 10
+            }
+          })
+        };
+        if (start_seas) {
+          chart.xAxis[0].addPlotLine({
+            value: start_seas,
+            color: 'green',
+            width: 2,
+            id: 'plot-line-2',
+            label: {
+              text: 'Start Season',
+              align: 'left',
+              y: 10
+            }
+          })
+        };
+      });
+    };
+
+
+
+    layer.on('featureClicked', featureEvent => {
+      var sqlQueryFeatureInfo = "SELECT id_numero, crop, harvest, start_seas, _2211_mean FROM envsys_parcels WHERE id_numero = " + featureEvent.data.id_numero;
+      var sqlQueryChart = sqlBaseChart.replace("LIMIT 1000", "");
+      sqlQueryChart += "WHERE id_numero = " + featureEvent.data.id_numero;
+
+      createFeatureInfoFromQuery(sqlQueryFeatureInfo, featureEvent.data.id_numero, sqlQueryChart, createChartFromQuery);
+    });
+  </script>
+</body>
+
+</html>
