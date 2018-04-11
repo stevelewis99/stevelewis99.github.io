@@ -1,0 +1,28 @@
+/* Styles go here */
+
+body {
+      width: 100vw;
+      height: 100vh;
+      min-height: 100vh;
+      background-color: #0f0b24;
+      padding: 10px;
+    }
+    
+    .fill {
+      height: 100vh;
+      min-height: 100vw;
+    }
+    
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+    
+    .popup-container {
+      padding: 0px;
+    }
+    
+    .popup-container h2 {
+      font: 600 16px/22px 'Open Sans';
+      margin-bottom: 12px
+    }
