@@ -99,7 +99,8 @@
         <label for="auto">Only Supermarkets</label>
       </li>
     </ul><br/>-->
-    <p onclick="flyToBrisbane();">Fly to Brisbane</p>
+    <p onclick="flyToBrisbane();">Fly to Brisbane</p><br/>
+    <p onclick="flyToAustralia();">Zoom out</p>
   </div>
   <script>
     const map = new mapboxgl.Map({
@@ -214,6 +215,13 @@
       map.flyTo({
         center: [153.021072, -27.470125],
         zoom: 11
+      });
+    }
+
+    function flyToAustralia() {
+      map.flyTo({
+        center: [133.7751, -25.2744],
+        zoom: 3
       });
     }
   </script>
