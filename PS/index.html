@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Ramp category | CARTO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <!-- Include CARTO VL JS -->
+  <script src="https://cartodb.github.io/carto-vl/dist/carto-vl.js"></script>
+  <!-- Include Mapbox GL JS -->
+  <script src="https://cartodb.github.io/carto-vl/vendor/mapbox-gl-dev.js"></script>
+  <!-- Include Mapbox GL CSS -->
+  <link href="https://cartodb.github.io/carto-vl/vendor/mapbox-gl-dev.css" rel="stylesheet" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    #map {
+      position: absolute;
+      height: 100%;
+      width: 100%;
+    }
+    
+    #controls {
+      position: absolute;
+      padding: 20px;
+      background: white;
+      top: 12px;
+      right: 12px;
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.12);
+      border-radius: 4px;
+      width: 160px;
+      color: #2E3C43;
+    }
+    
+    #controls li {
+      list-style-type: none;
+      margin: 0 0 8px 0;
+      display: flex;
+      vertical-align: middle;
+    }
+    
+    #controls li input {
+      margin: 0 8px 0 0;
+    }
+    
+    #controls li label {
+      font: 12px/16px 'Open Sans';
+      cursor: pointer;
+    }
+    
+    #controls li:last-child {
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <div id="controls">
+    <h5>Polygons</h5>
+    <br/>
+    <ul>
+      <li>
+        <input type="radio" name="style" onclick="setPolysPurple()" id="poly_purple" checked>
+        <label for="auto">Purple</label>
+      </li>
+      <li>
+        <input type="radio" name="style" onclick="setPolysGreen()" id="poly_green">
+        <label for="auto">Green</label>
+      </li>
+      <li>
+        <input type="radio" name="style" onclick="setPolysGray()" id="poly_gray">
+        <label for="auto">Grey</label>
+      </li>
+    </ul>
+    <br/>
+    <h5>Points</h5>
+    <br/>
+    <ul>
+      <li>
+        <input type="radio" name="points_style" onclick="setPointsSolid()" id="solid" checked>
+        <label for="auto">Solid</label>
+      </li>
+      <li>
+        <input type="radio" name="points_style" onclick="setRampCategory()" id="catgeory">
+        <label for="auto">Ramp Category</label>
+      </li>
+    </ul>
+    <br/>
+    <!--<h5>Filter</h5>
+    <br/>
+    <ul>
+      <li>
+        <input type="checkbox" name="filter" onclick="setPointsFilter()" id="pointsFilter">
+        <label for="auto">Only Supermarkets</label>
+      </li>
+    </ul><br/>-->
+    <p onclick="flyToBrisbane();">Fly to Brisbane</p>
+  </div>
+  <script>
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      center: [133.7751, -25.2744],
+      zoom: 3,
+      dragRotate: false
+    });
+
+    carto.setDefaultAuth({
+      user: 'steve-carto',
+      apiKey: 'YOUR_API_KEY'
+    });
+
+    const source = new carto.source.Dataset(`
+      sa1_2016_aust
+    `);
+    const s = carto.expressions;
+    const viz = new carto.Viz({
+      color: s.rgba(100, 0, 175, 0.5)
+    });
+    const layer = new carto.Layer('layer', source, viz);
+    
+    var polysColor = s.rgba(100, 0, 175, 0.5);
+
+/*
+    const interactivity = new carto.Interactivity(layer);
+    interactivity.on('featureEnter', event => {
+      style(event.features);
+    });
+    interactivity.on('featureLeave', event => {
+      styleRevert(event.features);
+    });
+*/
+    layer.addTo(map);
+
+    const points_source = new carto.source.Dataset(`
+      australia_retail_points
+    `);
+    const points_viz = new carto.Viz({
+      color: s.rgba(180, 0, 20, 0.9),
+      strokeWidth: 0.3,
+      strokeColor: s.hsv(1, 0, 1)
+    });
+    const points_layer = new carto.Layer('points_layer', points_source, points_viz);
+    points_layer.addTo(map);
+
+    function setPolysPurple() {
+      polysColor = s.rgba(100, 0, 175, 0.5);
+      layer.blendToViz(new carto.Viz({
+        color: polysColor
+      }));
+    }
+
+    function setPolysGreen() {
+      polysColor = s.rgba(60, 200, 40, 0.8);
+      layer.blendToViz(new carto.Viz({
+        color: polysColor
+      }));
+    }
+    
+    function setPolysGray() {
+      polysColor = s.rgba(120, 120, 120, 0.3);
+      layer.blendToViz(new carto.Viz({
+        color: polysColor
+      }));
+    }
+
+    function setPointsSolid() {
+      points_layer.blendToViz(new carto.Viz({
+        color: s.rgba(180, 0, 20, 0.9),
+        strokeWidth: 0.3,
+        strokeColor: s.hsv(1, 0, 1)
+      }));
+    }
+
+    function setRampCategory() {
+      points_layer.blendToViz(new carto.Viz({
+        color: s.ramp(s.prop('type'), s.palettes.VIVID),
+        strokeWidth: 0.5,
+        strokeColor: s.rgba(230, 230, 230, 0.8),
+        width: 7
+      }));
+    }
+    
+    function style(features){
+      features.forEach(function(feature){
+        feature.color.blendTo(s.rgba(20, 20, 20, 0.9),200);
+      })
+    }
+    
+    function styleRevert(features){
+      features.forEach(function(feature){
+        feature.color.blendTo(polysColor,200);
+      })
+    }
+
+    //not implemented
+    function setPointsFilter() {
+      console.log(points_layer);
+      points_layer.blendToViz(new carto.Viz({
+        color: s.ramp(s.prop('type'), s.palettes.VIVID),
+        strokeWidth: 0.5,
+        strokeColor: s.rgba(230, 230, 230, 0.8),
+        width: 7,
+        filter: 1
+      }));
+    }
+
+    function flyToBrisbane() {
+      map.flyTo({
+        center: [153.021072, -27.470125],
+        zoom: 11
+      });
+    }
+  </script>
+</body>
+
+</html>
