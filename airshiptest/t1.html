@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Example | CARTO-VL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <!-- Include CARTO VL JS -->
+  <script src="https://libs.cartocdn.com/carto-vl/v0.6.2/carto-vl.min.js"></script>
+  <!-- Include Mapbox GL JS -->
+  <script src="https://libs.cartocdn.com/mapbox-gl/v0.45.0-carto1/mapbox-gl.js"></script>
+  <!-- Include Mapbox GL CSS -->
+  <link href="https://libs.cartocdn.com/mapbox-gl/v0.45.0-carto1/mapbox-gl.css" rel="stylesheet" />
+
+  <!-- Include airship -->
+  <link rel="stylesheet" href="https://deploy-preview-141--carto-airship.netlify.com/packages/styles/dist/airship.css">
+
+  <link href="https://carto.com/developers/carto-vl/examples/maps/style.css" rel="stylesheet">
+
+
+  <style>
+    #map {
+      position: absolute;
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body class="as-app as-app--nav-top">
+  <div role="tablist" class="as-toolbar-tabs as-tabs">
+    <button onclick="showMap(event)" role="tab" class="as-tabs__item as-tabs__item--active">MAP</button>
+    <button onclick="showLeft(event)" role="tab" class="as-tabs__item">LEFT</button>
+    <button onclick="showRight(event)" role="tab" class="as-tabs__item">RIGHT</button>
+  </div>
+
+  <main class="as-app-content">
+    <aside class="as-sidebar as-sidebar--left">
+      <h1>Left Sidebar</h1>
+      <p>
+        <div class="cvl-MapInfo map-info"></div>
+      </p>
+    </aside>
+
+    <div class="as-map-wrapper">
+      <div id="map"></div>
+    </div>
+
+    <aside class="as-sidebar as-sidebar--right">
+      <div id="right-panel-1" class="as-container as-container--border">
+        <section class="as-box">
+          <h1 class="as-title">Fixed container</h1>
+          <p>Use this container when you need to present fixed content. This content will occupy as much vertical space as
+            needed.
+          </p>
+        </section>
+      </div>
+      <div class="as-container as-container--scrollable">
+        <section class="as-box">
+          <h1 class="as-title">Scrollable container</h1>
+          <p>When you need to present lots of content that don't fit in the available space, use a scrollable container.
+            It'll take the space left by the fixed containers.</p>
+        </section>
+        <section class="as-box">
+          <h1 class="as-title">A box</h1>
+          <p>This content is here to fill up more space than available so you can scroll.</p>
+        </section>
+        <section class="as-box">
+          <h1 class="as-box">A box</h1>
+          <p>This content is here to fill up more space than available so you can scroll.</p>
+        </section>
+      </div>
+    </aside>
+  </main>
+</body>
+
+<script>
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    center: [-4.076911, 54.812878],
+    zoom: 4.6,
+    dragRotate: false
+  });
+
+  carto.setDefaultAuth({
+    user: 'steve-carto',
+    apiKey: 'mTu8h5h0JSd5dZaR6uOMeQ'
+  });
+
+  const mrli_pc_sector_source = new carto.source.SQL(`
+    SELECT cartodb_id,
+           the_geom,
+           the_geom_webmercator,
+           gissect as postcode_sector,
+           total_merchants,
+           sales_score,
+           growth_score,
+           stability_score,
+           ticket_size_score,
+           transactions_score,
+           month_date
+    FROM mrli_uk
+    WHERE month_date = '2018-04-01'
+    AND category = 'total retail'
+    ORDER BY sales_score desc
+    
+  `);
+
+  const mrli_pc_area_source = new carto.source.SQL(`
+    SELECT p.cartodb_id, p.the_geom, p.the_geom_webmercator, avg(m.sales_pc_area_score) as avg_sales_score
+    FROM postcode_areas p
+    LEFT JOIN mrli_uk_raw m
+    ON p.postcode_area = m.postcode_area
+    WHERE m.category = 'total retail'
+    AND m.month = '2018-04-01'
+    GROUP BY p.cartodb_id, p.the_geom, p.the_geom_webmercator
+    
+  `);
+
+  const mrli_pc_district_source = new carto.source.SQL(`
+    SELECT p.cartodb_id, p.the_geom, p.the_geom_webmercator, avg(m.sales_pc_district_score) as avg_sales_score
+    FROM postcode_district p
+    LEFT JOIN mrli_uk_raw m
+    ON p.postcode_district = m.postcode_district
+    WHERE m.category = 'total retail'
+    AND m.month = '2018-04-01'
+    GROUP BY p.cartodb_id, p.the_geom, p.the_geom_webmercator
+    
+  `);
+
+
+
+
+  const s = carto.expressions;
+
+  const viz_sector = new carto.Viz({
+    color: s.opacity(s.ramp(s.globalQuantiles(s.prop('sales_score'), 10), s.palettes.SUNSETDARK), 0.5),
+    strokeColor: s.rgba(120, 120, 120, 0.5),
+    filter: s.between(s.zoom(), s.pow(2, 8.2), s.pow(2, 15))
+  });
+
+  const sector_layer = new carto.Layer('sector_layer', mrli_pc_sector_source, viz_sector);
+  sector_layer.addTo(map);
+
+  const viz_district = new carto.Viz({
+    color: s.ramp(s.globalQuantiles(s.prop('avg_sales_score'), 10), s.palettes.SUNSETDARK),
+    strokeColor: s.rgba(255, 255, 255, 0.9),
+    filter: s.between(s.zoom(), s.pow(2, 6), s.pow(2, 8.2))
+  });
+
+  const district_layer = new carto.Layer('district_layer', mrli_pc_district_source, viz_district);
+  district_layer.addTo(map);
+
+  const viz_area = new carto.Viz({
+    variables: {
+      score: s.prop('avg_sales_score')
+    },
+    color: s.ramp(s.globalQuantiles(s.prop('avg_sales_score'), 10), s.palettes.SUNSETDARK),
+    strokeColor: s.rgba(255, 255, 255, 0.9),
+    filter: s.between(s.zoom(), s.pow(2, 0), s.pow(2, 6))
+  });
+
+  const area_layer = new carto.Layer('area_layer', mrli_pc_area_source, viz_area);
+
+  // Define interactivity
+  const interactivity = new carto.Interactivity(area_layer);
+  interactivity.on('featureClick', updatePanel);
+
+  area_layer.addTo(map);
+
+  map.on('zoom', updateMapInfo);
+  map.on('move', updateMapInfo);
+
+  // Add zoom and rotation controls to the map.
+  map.addControl(new mapboxgl.NavigationControl());
+
+  function updateMapInfo() {
+    let center = map.getCenter();
+    document.querySelector('.map-info').innerText = `Center: [${center.lng.toFixed(6)}, ${center.lat.toFixed(6)}] \n Zoom: ${map.getZoom().toFixed(6)}`;
+  }
+
+  function updatePanel(event) {
+    let content = '';
+    for (let feature of event.features) {
+      content += `
+        <section class="as-box">
+        <h1 class="as-title">Score</h1>
+        <h2>
+            ${feature.variables.score.value}
+        </h2>
+      </section>
+      `;
+    }
+    document.getElementById('right-panel-1').innerHTML = content;
+  }
+
+  updateMapInfo();
+
+/*
+  const interactivity = new carto.Interactivity(layer);
+  interactivity.on('featureClick', event => {
+    var target = [];
+    target.push(event.coordinates.lng);
+    target.push(event.coordinates.lat);
+    flyToPlace(target, 7);
+  });
+
+
+  function setColorRampColumn(column) {
+    console.log('setColorRampColumn fired: ' + column)
+    let newViz = new carto.Viz({
+      color: s.ramp(s.globalQuantiles(s.prop(column), 10), s.palettes.DARKMINT),
+      strokeColor: s.rgba(120, 120, 120, 0.5),
+      filter: s.between(s.prop('polygon_area'), s.div(1, s.mul(s.zoom(), 100)), 0.2)
+    });
+
+    //this didn't work out:
+    // let newViz = new carto.Viz(viz._getdefinition);
+    // console.log(newViz);
+    // newViz.color = s.ramp(s.globalQuantiles(s.prop(column), 10), s.palettes.DARKMINT);
+
+    layer.blendToViz(newViz, 5000);
+  }
+
+  function printVizVariables() {
+    console.log("Variable: glob_min = " + viz.variables.glob_min.value);
+    console.log("Variable: glob_max = " + viz.variables.glob_max.value);
+    console.log("Variable: area_min = " + viz.variables.area_min.value);
+    console.log("Variable: area_max = " + viz.variables.area_max.value);
+  }
+
+  function flyToPlace(target, zoom) {
+    map.flyTo({
+      center: target,
+      zoom: zoom,
+      bearing: 0,
+      speed: 0.3,
+      curve: 1
+    });
+  }
+  */
+
+</script>
+
+</html>

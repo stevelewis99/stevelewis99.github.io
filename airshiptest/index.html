@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Example | CARTO-VL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <!-- Include CARTO VL JS -->
+  <script src="https://libs.cartocdn.com/carto-vl/v0.5.0-beta/carto-vl.js"></script>
+  <!-- Include Mapbox GL JS -->
+  <script src="https://cartodb-libs.global.ssl.fastly.net/mapbox-gl/v0.45.0-carto1/mapbox-gl.js"></script>
+  <!-- Include Mapbox GL CSS -->
+  <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.45.0/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    #map {
+      position: absolute;
+      height: 100%;
+      width: 100%;
+    }
+
+    #controls {
+      position: absolute;
+      padding: 20px;
+      background: white;
+      top: 12px;
+      right: 12px;
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.12);
+      border-radius: 4px;
+      width: 160px;
+      color: #2E3C43;
+    }
+
+    #controls li {
+      list-style-type: none;
+      margin: 0 0 8px 0;
+      display: flex;
+      vertical-align: middle;
+    }
+
+    #controls li input {
+      margin: 0 8px 0 0;
+    }
+
+    #controls li label {
+      font: 12px/16px 'Open Sans';
+      cursor: pointer;
+    }
+
+    #controls li:last-child {
+      margin-bottom: 0;
+    }
+
+    #title {
+      position: absolute;
+      padding: 20px;
+      background: white;
+      top: 12px;
+      left: 12px;
+      box-shadow: 0 0 16px rgba(0, 0, 0, 0.12);
+      border-radius: 4px;
+      width: 460px;
+      color: #2E3C43;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <div id="controls">
+    <h5>Select year</h5>
+    <br/>
+    <ul>
+      <li>
+        <input type="radio" name="style" onclick="setColorRampColumn('_2005')" id="poly_2005" checked>
+        <label for="auto">2005</label>
+      </li>
+      <li>
+        <input type="radio" name="style" onclick="setColorRampColumn('_2006')" id="poly_2006">
+        <label for="auto">2006</label>
+      </li>
+      <li>
+        <input type="radio" name="style" onclick="setColorRampColumn('_2007')" id="poly_2007">
+        <label for="auto">2007</label>
+      </li>
+      <li>
+        <input type="radio" name="style" onclick="setColorRampColumn('_2008')" id="poly_2008">
+        <label for="auto">2008</label>
+      </li>
+      <li>
+        <input type="radio" name="style" onclick="setColorRampColumn('_2009')" id="poly_2009">
+        <label for="auto">2009</label>
+      </li>
+      <li>
+        <input type="radio" name="style" onclick="setColorRampColumn('_2010')" id="poly_2010">
+        <label for="auto">2010</label>
+      </li>
+    </ul>
+    <br/>
+    <!-- <p onclick="printVizVariables();">Print viz vars</p>
+    <br/> -->
+    <button type="button" onclick="flyToPlace([-4.18265, 56.816922],5.7);">Reset map view</button>
+    <br/>
+    
+  </div>
+  <div id="title">
+    <p><b>Scottish Deprivation due to Employment:</b></p>
+    <p><i>Variance with preceding year</i></p>
+  </div>
+  <script>
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      center: [-4.18265, 56.816922],
+      zoom: 5.7,
+      dragRotate: false
+    });
+
+    carto.setDefaultAuth({
+      user: 'steve-carto',
+      apiKey: '6Lw1Y1TTqhkvUxW2g7syPg'
+    });
+
+    const source = new carto.source.SQL(`
+      SELECT * FROM sg_datazone_bdry_2001_deprv_time 
+      WHERE the_geom && ST_MakeEnvelope(-7.65, 58.66, -1.7, 54.7, 4326)
+    `);
+    const s = carto.expressions;
+    const viz = new carto.Viz({
+      variables: {
+        glob_min: s.globalMin(s.prop('_2005')),
+        glob_max: s.globalMax(s.prop('_2005')),
+        area_min: s.globalMin(s.prop('polygon_area')),
+        area_max: s.globalMax(s.prop('polygon_area'))
+      },
+      color: s.ramp(s.globalQuantiles(s.prop('_2005'), 10), s.palettes.DARKMINT),
+      strokeColor: s.rgba(120, 120, 120, 0.5),
+      filter: s.between(s.prop('polygon_area'), s.div(1, s.mul(s.zoom(),100)), 0.2)
+    });
+    const layer = new carto.Layer('layer0', source, viz);
+    layer.addTo(map);
+
+
+    const interactivity = new carto.Interactivity(layer);
+    interactivity.on('featureClick', event => {
+      var target = [];
+      target.push(event.coordinates.lng);
+      target.push(event.coordinates.lat);
+      flyToPlace(target,7);
+    });
+
+
+    function setColorRampColumn(column) {
+      console.log('setColorRampColumn fired: ' + column)
+      let newViz = new carto.Viz({
+        color: s.ramp(s.globalQuantiles(s.prop(column), 10), s.palettes.DARKMINT),
+        strokeColor: s.rgba(120, 120, 120, 0.5),
+        filter: s.between(s.prop('polygon_area'), s.div(1, s.mul(s.zoom(),100)), 0.2)
+      });
+
+      //this didn't work out:
+      // let newViz = new carto.Viz(viz._getdefinition);
+      // console.log(newViz);
+      // newViz.color = s.ramp(s.globalQuantiles(s.prop(column), 10), s.palettes.DARKMINT);
+
+      layer.blendToViz(newViz, 5000);
+    }
+
+    function printVizVariables() {
+      console.log("Variable: glob_min = " + viz.variables.glob_min.value);
+      console.log("Variable: glob_max = " + viz.variables.glob_max.value);
+      console.log("Variable: area_min = " + viz.variables.area_min.value);
+      console.log("Variable: area_max = " + viz.variables.area_max.value);
+    }
+
+    function flyToPlace(target,zoom){
+      map.flyTo({
+        center: target,
+        zoom: zoom,
+        bearing: 0,
+        speed: 0.3, 
+        curve: 1
+    });
+    }
+
+  </script>
+</body>
+
+</html>
